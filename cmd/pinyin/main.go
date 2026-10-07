@@ -3,13 +3,16 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/solid-state-dan/chinese-text-converter/pkg/converter"
 	"github.com/solid-state-dan/chinese-text-converter/pkg/dictionary"
+	"github.com/solid-state-dan/chinese-text-converter/pkg/processor"
 )
 
 func main() {
+	// 1. Load Dictionary
 	fmt.Println("Loading CC-CEDICT dictionary...")
 	start := time.Now()
 
@@ -22,20 +25,33 @@ func main() {
 	fmt.Printf("Successfully loaded %d entries in %v!\n\n", len(dict), elapsed)
 
 	conv := converter.New(dict)
+	proc := processor.New(conv)
 
-	testSentences := []string{
-		"你好世界",
-		"我爱吃北京烤鸭",
-		"今天天气很好，我去银行",
-		"Hello World! 这是一个测试 123.",
-	}
+	// 2. Create a small test .srt file
+	sampleSRT := `1
+00:00:01,000 --> 00:00:03,000
+你好，
 
+2
+00:00:04,000 --> 00:00:07,000
+世界！
+`
+	inputPath := "data/sample.srt"
+	outputPath := "data/sample_pinyin.srt"
+
+	os.WriteFile(inputPath, []byte(sampleSRT), 0644)
+
+	// 3. Process File
 	start = time.Now()
-	for _, sentence := range testSentences {
-		result := conv.ToPinyin(sentence)
-		fmt.Printf("Input:  %s\n", sentence)
-		fmt.Printf("Pinyin: %s\n\n", result)
+	err = proc.ProcessSRTDual(inputPath, outputPath)
+	if err != nil {
+		log.Fatalf("Processing failed: %v", err)
 	}
-	elapsed = time.Since(start)
-	fmt.Printf("Successfully converted entries in %v!\n\n", elapsed)
+
+	fmt.Printf("Processed %s -> %s in %v!\n\n", inputPath, outputPath, time.Since(start))
+
+	// 4. Print generated file contents to terminal
+	outputContent, _ := os.ReadFile(outputPath)
+	fmt.Println("Generated SRT Output:")
+	fmt.Println(string(outputContent))
 }
