@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -12,46 +13,48 @@ import (
 )
 
 func main() {
-	// 1. Load Dictionary
-	fmt.Println("Loading CC-CEDICT dictionary...")
+	// 1. Define command-line flags
+	inputPath := flag.String("i", "", "Path to input .srt file (required)")
+	outputPath := flag.String("o", "", "Path to output .srt file (required)")
+	dictPath := flag.String("dict", "data/cedict_ts.u8", "Path to CC-CEDICT dictionary file")
+
+	// Custom usage message when running -help or passing invalid flags
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s -i <input.srt> -o <output.srt> [-dict <cedict.u8>]\n\nOptions:\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+
+	flag.Parse()
+
+	// 2. Validate required flags
+	if *inputPath == "" || *outputPath == "" {
+		fmt.Fprintln(os.Stderr, "Error: Both -i and -o flags are required.")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	// 3. Load dictionary
+	fmt.Printf("Loading dictionary from %s...\n", *dictPath)
 	start := time.Now()
 
-	dict, err := dictionary.Load("data/cedict_ts.u8")
+	dict, err := dictionary.Load(*dictPath)
 	if err != nil {
 		log.Fatalf("Failed to load dictionary: %v", err)
 	}
+	fmt.Printf("Loaded dictionary in %v.\n", time.Since(start))
 
-	elapsed := time.Since(start)
-	fmt.Printf("Successfully loaded %d entries in %v!\n\n", len(dict), elapsed)
-
+	// 4. Initialize converter and processor
 	conv := converter.New(dict)
 	proc := processor.New(conv)
 
-	// 2. Create a small test .srt file
-	sampleSRT := `1
-00:00:01,000 --> 00:00:03,000
-你好，
+	// 5. Process SRT file
+	fmt.Printf("Processing %s -> %s...\n", *inputPath, *outputPath)
+	processStart := time.Now()
 
-2
-00:00:04,000 --> 00:00:07,000
-世界！
-`
-	inputPath := "data/sample.srt"
-	outputPath := "data/sample_pinyin.srt"
-
-	os.WriteFile(inputPath, []byte(sampleSRT), 0644)
-
-	// 3. Process File
-	start = time.Now()
-	err = proc.ProcessSRTDual(inputPath, outputPath)
+	err = proc.ProcessSRTDual(*inputPath, *outputPath)
 	if err != nil {
 		log.Fatalf("Processing failed: %v", err)
 	}
 
-	fmt.Printf("Processed %s -> %s in %v!\n\n", inputPath, outputPath, time.Since(start))
-
-	// 4. Print generated file contents to terminal
-	outputContent, _ := os.ReadFile(outputPath)
-	fmt.Println("Generated SRT Output:")
-	fmt.Println(string(outputContent))
+	fmt.Printf("Successfully generated dual-line subtitles in %v!\n", time.Since(processStart))
 }
